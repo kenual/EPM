@@ -10,7 +10,7 @@ Oracle EPM MCP Server
         "run",
         "--directory",
         "~/Documents/GitHub/epm",
-        "main.py"
+        "epm.py"
       ],
       "env": {},
       "disabled": false

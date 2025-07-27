@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import List, TypedDict
 from urllib.parse import urlparse
 
 import httpx
@@ -14,17 +14,22 @@ class UserProfile(TypedDict):
     pwd: str
 
 
+def get_base_url(url: str) -> str:
+    parsed_url = urlparse(url)
+    base_url = f"{parsed_url.scheme}://{parsed_url.hostname}:{parsed_url.port}/HyperionPlanning/rest/v3"
+    return base_url
+
+
 @mcp.tool()
-async def connect(base_url: str, user: str, pwd: str) -> UserProfile | str:
+async def connect(epm_server_url: str, user: str, pwd: str) -> UserProfile | str:
     """Connect to EPM server URL.
 
     Args:
-        base_url: EPM Planning server base URL
+        epm_server_url: EPM server URL
         user: EPM user name
         pwd: EPM user password
     """
-    parsed_url = urlparse(base_url)
-    rest_url = f"{parsed_url.scheme}://{parsed_url.hostname}:{parsed_url.port}/HyperionPlanning/rest/v3"
+    rest_url = get_base_url(epm_server_url)
 
     async with httpx.AsyncClient() as client:
         response = await client.get(
@@ -40,13 +45,14 @@ async def connect(base_url: str, user: str, pwd: str) -> UserProfile | str:
 
 
 @mcp.tool()
-async def get_applications(profile: UserProfile) -> str:
+async def get_applications(profile: UserProfile) -> List[str] | str:
     """Returns a list of applications to which the specified user is assigned.
 
     Args:
         profile: connected user profile
     """
-    resource_url = f"{profile.get('url', 'url')}/applications"
+    epm_server_url = profile.get('url', 'epm_server_url')
+    resource_url = f"{get_base_url(epm_server_url)}/applications"
     user = profile.get('user', 'user')
     pwd = profile.get('pwd', 'pwd')
 
