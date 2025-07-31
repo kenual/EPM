@@ -1,7 +1,7 @@
 import tomllib
 import pytest
 import pytest_asyncio
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, Mock
 from epm.essbase import connect, get_applications, UserProfile
 
 def get_live_test_instance():
@@ -55,6 +55,32 @@ async def test_connect_live_no_mock():
     assert result["user"] == "admin"
     assert result["pwd"] == "welcome1"
     assert "/about" in result["url"]
+
+
+@pytest.mark.asyncio
+async def test_get_applications_success(profile):
+    # Mock the JSON response data
+    mock_json_data = ["DemoApp1", "DemoApp2"]
+
+    # Create a mock response
+    mock_response = Mock()  # Use Mock, not AsyncMock for the response object
+    mock_response.status_code = 200
+    # json() is sync, not async
+    mock_response.json = Mock(return_value=mock_json_data)
+
+    # Mock the async client
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=mock_response)
+
+    # Patch the AsyncClient context manager
+    with patch("httpx.AsyncClient") as mock_async_client:
+        mock_async_client.return_value.__aenter__.return_value = mock_client
+
+        result = await get_applications(profile)
+
+    assert isinstance(result, list)
+    assert result == ["DemoApp1", "DemoApp2"]
+
 
 @pytest.mark.asyncio
 async def test_get_applications_error_mock(profile):
