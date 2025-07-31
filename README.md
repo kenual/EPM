@@ -1,6 +1,6 @@
 Oracle EPM MCP Server
 
-npx @modelcontextprotocol/inspector uv run --directory ~/Documents/GitHub/epm essbase.py
+npx @modelcontextprotocol/inspector uv run --directory ~/Documents/GitHub/epm epm/essbase.py
 
 ```json
 {
@@ -11,7 +11,7 @@ npx @modelcontextprotocol/inspector uv run --directory ~/Documents/GitHub/epm es
         "run",
         "--directory",
         "~/Documents/GitHub/epm",
-        "essbase.py"
+        "epm/essbase.py"
       ],
       "env": {},
       "disabled": false
