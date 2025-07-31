@@ -1,16 +1,17 @@
 Oracle EPM MCP Server
 
+npx @modelcontextprotocol/inspector uv run --directory ~/Documents/GitHub/epm essbase.py
 
 ```json
 {
   "mcpServers": {
-    "EPM": {
+    "Essbase": {
       "command": "uv",
       "args": [
         "run",
         "--directory",
         "~/Documents/GitHub/epm",
-        "epm.py"
+        "essbase.py"
       ],
       "env": {},
       "disabled": false
