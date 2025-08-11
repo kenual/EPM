@@ -2,7 +2,7 @@ import tomllib
 import pytest
 import pytest_asyncio
 from unittest.mock import patch, AsyncMock, Mock
-from epm.essbase import connect, get_applications, UserProfile
+from epm.essbase import connect, list_applications, list_databases, Application, UserProfile
 
 def get_live_test_instance():
     with open("test_config.toml", "rb") as f:
@@ -58,7 +58,7 @@ async def test_connect_live_no_mock():
 
 
 @pytest.mark.asyncio
-async def test_get_applications_success(profile):
+async def test_list_applications_success(profile):
     # Mock the JSON response data
     mock_json_data = ["DemoApp1", "DemoApp2"]
 
@@ -76,32 +76,53 @@ async def test_get_applications_success(profile):
     with patch("httpx.AsyncClient") as mock_async_client:
         mock_async_client.return_value.__aenter__.return_value = mock_client
 
-        result = await get_applications(profile)
+        result = await list_applications(profile)
 
     assert isinstance(result, list)
     assert result == ["DemoApp1", "DemoApp2"]
 
 
 @pytest.mark.asyncio
-async def test_get_applications_error_mock(profile):
+async def test_list_applications_error_mock(profile):
     mock_response = AsyncMock()
     mock_response.status_code = 403
     mock_response.text = "Forbidden"
 
     with patch("httpx.AsyncClient.get", new=AsyncMock(return_value=mock_response)):
-        result = await get_applications(profile)
+        result = await list_applications(profile)
     # Should return an error string indicating 403
     assert isinstance(result, str)
     assert "HTTP 403" in result
 
 @pytest.mark.asyncio
-async def test_get_applications_live_no_mock():
+async def test_list_applications_live_no_mock():
     """
     Live integration test: retrieves the list of Essbase applications for the user profile from a real Essbase instance.
     """
-    from epm.essbase import get_applications
-
     live_profile = get_live_test_instance()
-    result = await get_applications(live_profile)
+    result = await list_applications(live_profile)
     print(result)
     assert isinstance(result, list), f"Expected list payload from API, got: {type(result)}"
+
+@pytest.mark.asyncio
+async def test_list_databases_live_no_mock():
+    """
+    Live integration test: lists databases for the first application on a real Essbase instance.
+    """
+    live_profile = get_live_test_instance()
+    app_list = await list_applications(live_profile)
+    assert isinstance(app_list, list), f"Expected application list, got: {type(app_list)}"
+    assert len(app_list) > 0, "No applications found to test database listing"
+
+    first_app_name = app_list[0]
+    # Build Application dict (subclass of UserProfile with 'app')
+    app_profile = Application(
+        url=live_profile["url"],
+        user=live_profile["user"],
+        pwd=live_profile["pwd"],
+        app=first_app_name
+    )
+    result = await list_databases(app_profile)
+    print(f"Databases for app '{first_app_name}':", result)
+    assert isinstance(result, list), f"Expected list of databases, got: {type(result)}"
+    assert len(result) > 0, f"No databases returned for application '{first_app_name}'"

@@ -10,8 +10,12 @@ mcp = FastMCP("Essbase")
 
 class UserProfile(TypedDict):
     url: str
-    user: str = "admin"
-    pwd: str = "welcome1"
+    user: str
+    pwd: str
+
+
+class Application(UserProfile):
+    app: str
 
 
 def get_base_url(url: str) -> str:
@@ -53,13 +57,14 @@ async def connect(profile: UserProfile) -> UserProfile | str:
 
 
 @mcp.tool()
-async def get_applications(profile: UserProfile) -> List[str] | str:
+async def list_applications(profile: UserProfile) -> List[str] | str:
     """Returns a list of applications to which the specified user is assigned.
 
     Args:
         profile: connected user profile
     """
-    resource_url = f"{get_base_url(profile['url'])}/applications/actions/name/ALL"
+    base_url = get_base_url(profile['url'])
+    resource_url = f"{base_url}/applications/actions/name/ALL"
     user = profile['user']
     pwd = profile['pwd']
 
@@ -78,6 +83,34 @@ async def get_applications(profile: UserProfile) -> List[str] | str:
             return f'''Error: GET {resource_url}
             HTTP {response.status_code}
             {response.text}'''
+
+
+@mcp.tool()
+async def list_databases(app_profile: Application) -> List[str] | str:
+    """List Essbase databases for the input application.
+
+    Args:
+        app_profile: Application dict with Essbase connection and application name.
+    """
+    base_url = get_base_url(app_profile['url'])
+    app = app_profile['app']
+    user = app_profile['user']
+    pwd = app_profile['pwd']
+
+    resource_url = f"{base_url}/applications/{app}/databases"
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            resource_url,
+            auth=(user, pwd)
+        )
+        if response.status_code == 200:
+            data = response.json()
+
+            database_names = [item['name'] for item in data['items']]
+            return database_names
+        else:
+            return f'''Error: GET {resource_url}\nHTTP {response.status_code}\n{response.text}'''
 
 if __name__ == "__main__":
     # Initialize and run the server
