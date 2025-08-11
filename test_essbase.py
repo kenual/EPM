@@ -4,14 +4,17 @@ import pytest_asyncio
 from unittest.mock import patch, AsyncMock, Mock
 from epm.essbase import connect, list_applications, list_databases, Application, UserProfile
 
+
 def get_live_test_instance():
     with open("test_config.toml", "rb") as f:
         config = tomllib.load(f)
     return dict(config["essbase_test_instance"])
 
+
 @pytest_asyncio.fixture
 def profile():
     return UserProfile(url="http://localhost", user="admin", pwd="welcome1")
+
 
 @pytest.mark.asyncio
 async def test_connect_success(profile):
@@ -26,6 +29,7 @@ async def test_connect_success(profile):
     assert result["pwd"] == "welcome1"
     assert "/about" in result["url"]
 
+
 @pytest.mark.asyncio
 async def test_connect_content_type_error(profile):
     mock_response = AsyncMock()
@@ -35,6 +39,7 @@ async def test_connect_content_type_error(profile):
     assert isinstance(result, str)
     assert "Unexpected Content-Type" in result
 
+
 @pytest.mark.asyncio
 async def test_connect_httpx_exception(profile):
     with patch("httpx.AsyncClient.get", new=AsyncMock(side_effect=Exception("Connection error"))):
@@ -42,6 +47,7 @@ async def test_connect_httpx_exception(profile):
         with pytest.raises(Exception) as excinfo:
             await connect(profile)
         assert "Connection error" in str(excinfo.value)
+
 
 @pytest.mark.asyncio
 async def test_connect_live_no_mock():
@@ -51,7 +57,8 @@ async def test_connect_live_no_mock():
     live_profile = get_live_test_instance()
     result = await connect(live_profile)
     print(result)
-    assert isinstance(result, dict), f"Expected UserProfile dict, got: {result}"
+    assert isinstance(
+        result, dict), f"Expected UserProfile dict, got: {result}"
     assert result["user"] == "admin"
     assert result["pwd"] == "welcome1"
     assert "/about" in result["url"]
@@ -94,6 +101,7 @@ async def test_list_applications_error_mock(profile):
     assert isinstance(result, str)
     assert "HTTP 403" in result
 
+
 @pytest.mark.asyncio
 async def test_list_applications_live_no_mock():
     """
@@ -102,7 +110,9 @@ async def test_list_applications_live_no_mock():
     live_profile = get_live_test_instance()
     result = await list_applications(live_profile)
     print(result)
-    assert isinstance(result, list), f"Expected list payload from API, got: {type(result)}"
+    assert isinstance(
+        result, list), f"Expected list payload from API, got: {type(result)}"
+
 
 @pytest.mark.asyncio
 async def test_list_databases_live_no_mock():
@@ -111,7 +121,8 @@ async def test_list_databases_live_no_mock():
     """
     live_profile = get_live_test_instance()
     app_list = await list_applications(live_profile)
-    assert isinstance(app_list, list), f"Expected application list, got: {type(app_list)}"
+    assert isinstance(
+        app_list, list), f"Expected application list, got: {type(app_list)}"
     assert len(app_list) > 0, "No applications found to test database listing"
 
     first_app_name = app_list[0]
@@ -124,5 +135,50 @@ async def test_list_databases_live_no_mock():
     )
     result = await list_databases(app_profile)
     print(f"Databases for app '{first_app_name}':", result)
-    assert isinstance(result, list), f"Expected list of databases, got: {type(result)}"
-    assert len(result) > 0, f"No databases returned for application '{first_app_name}'"
+    assert isinstance(
+        result, list), f"Expected list of databases, got: {type(result)}"
+    assert len(
+        result) > 0, f"No databases returned for application '{first_app_name}'"
+
+
+@pytest.mark.asyncio
+async def test_list_dimensions_live_no_mock():
+    """
+    Live integration test: lists dimensions for the first database of the first application on a real Essbase instance.
+    """
+    from epm.essbase import list_dimensions, Database
+
+    live_profile = get_live_test_instance()
+    app_list = await list_applications(live_profile)
+    assert isinstance(
+        app_list, list), f"Expected application list, got: {type(app_list)}"
+    assert len(app_list) > 0, "No applications found to test dimension listing"
+
+    first_app_name = app_list[0]
+    app_profile = Application(
+        url=live_profile["url"],
+        user=live_profile["user"],
+        pwd=live_profile["pwd"],
+        app=first_app_name
+    )
+    db_list = await list_databases(app_profile)
+    assert isinstance(
+        db_list, list), f"Expected list of databases, got: {type(db_list)}"
+    assert len(
+        db_list) > 0, f"No databases returned for application '{first_app_name}'"
+
+    first_db_name = db_list[0]
+    db_profile = Database(
+        url=live_profile["url"],
+        user=live_profile["user"],
+        pwd=live_profile["pwd"],
+        app=first_app_name,
+        db=first_db_name
+    )
+    dim_result = await list_dimensions(db_profile)
+    print(
+        f"Dimensions for db '{first_db_name}' in app '{first_app_name}':", dim_result)
+    assert isinstance(
+        dim_result, list), f"Expected list of dimensions, got: {type(dim_result)}"
+    assert len(
+        dim_result) > 0, f"No dimensions returned for database '{first_db_name}' in application '{first_app_name}'"

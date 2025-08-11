@@ -18,6 +18,10 @@ class Application(UserProfile):
     app: str
 
 
+class Database(Application):
+    db: str
+
+
 def get_base_url(url: str) -> str:
     if url and url.startswith("http"):
         parsed_url = urlparse(url)
@@ -111,6 +115,36 @@ async def list_databases(app_profile: Application) -> List[str] | str:
             return database_names
         else:
             return f'''Error: GET {resource_url}\nHTTP {response.status_code}\n{response.text}'''
+
+
+@mcp.tool()
+async def list_dimensions(db_profile: Database) -> List[str] | str:
+    """List Essbase dimensions for the input database.
+
+    Args:
+        db_profile: Database dict with Essbase connection, application name, and database name.
+    """
+    base_url = get_base_url(db_profile['url'])
+    app = db_profile['app']
+    db = db_profile['db']
+    user = db_profile['user']
+    pwd = db_profile['pwd']
+
+    resource_url = f"{base_url}/applications/{app}/databases/{db}/dimensions"
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            resource_url,
+            auth=(user, pwd)
+        )
+        if response.status_code == 200:
+            data = response.json()
+            # Some APIs return items: [{name,...}], OAC includes 'name'
+            dimension_names = [item['name'] for item in data.get('items', [])]
+            return dimension_names
+        else:
+            return f'''Error: GET {resource_url}\nHTTP {response.status_code}\n{response.text}'''
+
 
 if __name__ == "__main__":
     # Initialize and run the server
