@@ -147,7 +147,7 @@ async def list_dimensions(db_profile: Database) -> List[str] | str:
             return f'''Error: GET {resource_url}\nHTTP {response.status_code}\n{response.text}'''
 
 
-from epm.mdx import (
+from mdx import (
     MemberRange, SetFunction, Set,
     member_range_MDX_expression as _member_range_MDX_expression,
     set_MDX_expression as _set_MDX_expression,
