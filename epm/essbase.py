@@ -3,6 +3,7 @@ from urllib.parse import urlparse
 
 import httpx
 from mcp.server.fastmcp import FastMCP
+from pydantic import BaseModel
 
 # Initialize FastMCP server
 mcp = FastMCP("Essbase")
@@ -139,11 +140,63 @@ async def list_dimensions(db_profile: Database) -> List[str] | str:
         )
         if response.status_code == 200:
             data = response.json()
-            # Some APIs return items: [{name,...}], OAC includes 'name'
+
             dimension_names = [item['name'] for item in data.get('items', [])]
             return dimension_names
         else:
             return f'''Error: GET {resource_url}\nHTTP {response.status_code}\n{response.text}'''
+
+
+class MemberRange(TypedDict):
+    start_member_name: str
+    end_member_name: str
+
+
+class SetFunction(BaseModel):
+    function_name: str
+
+
+class Set(TypedDict):
+    members: MemberRange | List[str] | SetFunction
+
+
+@mcp.tool()
+def member_range_MDX_expression(member_range: MemberRange) -> str:
+    """
+    Generate an MDX member range expression for Essbase.
+
+    Args:
+        member_range (MemberRange): A dictionary-like object with keys 'start_member_name' and 'end_member_name'.
+            - 'start_member_name' (str): The name of the first member in the range.
+            - 'end_member_name' (str): The name of the last member in the range.
+
+    Returns:
+        str: An MDX expression string representing the range between the start and end member, in the format:
+            'MemberRange(start_member_name, end_member_name)'
+    """
+    return f"MemberRange({member_range['start_member_name']}, {member_range['end_member_name']})"
+
+
+@mcp.tool()
+def set_MDX_expression(set_: Set) -> str:
+    """
+    Generate an MDX set expression for Essbase.
+
+    Args:
+        set_ (Set): A dictionary-like object with a 'members' key.
+            - 'members' can be a MemberRange, a list of member names, or a SetFunction.
+
+    Returns:
+        str: An MDX expression string representing the set.
+    """
+    if isinstance(set_['members'], MemberRange):
+        return member_range_MDX_expression(set_['members'])
+    elif isinstance(set_['members'], list):
+        return "{" + ", ".join(set_['members']) + "}"
+    elif isinstance(set_['members'], SetFunction):
+        return f"{set_['members'].function_name}()"
+    else:
+        raise ValueError("Invalid members type in Set")
 
 
 if __name__ == "__main__":
