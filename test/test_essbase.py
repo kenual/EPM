@@ -6,7 +6,7 @@ from epm.essbase import connect, list_applications, list_databases, Application,
 
 
 def get_live_test_instance():
-    with open("test_config.toml", "rb") as f:
+    with open("test/test_config.toml", "rb") as f:
         config = tomllib.load(f)
     return dict(config["essbase_test_instance"])
 
@@ -189,7 +189,7 @@ async def test_search_members_live_no_mock():
     """
     Live integration test: searches for a member in the first database of the first application on a real Essbase instance.
     """
-    from epm.essbase import list_dimensions, search_members, Database
+    from epm.essbase import search_members, Database
 
     live_profile = get_live_test_instance()
     app_list = await list_applications(live_profile)
