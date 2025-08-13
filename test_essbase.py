@@ -4,7 +4,6 @@ import pytest_asyncio
 from unittest.mock import patch, AsyncMock, Mock
 from epm.essbase import connect, list_applications, list_databases, Application, UserProfile
 
-
 def get_live_test_instance():
     with open("test_config.toml", "rb") as f:
         config = tomllib.load(f)
@@ -182,3 +181,42 @@ async def test_list_dimensions_live_no_mock():
         dim_result, list), f"Expected list of dimensions, got: {type(dim_result)}"
     assert len(
         dim_result) > 0, f"No dimensions returned for database '{first_db_name}' in application '{first_app_name}'"
+
+
+@pytest.mark.asyncio
+async def test_search_members_live_no_mock():
+    """
+    Live integration test: searches for a member in the first database of the first application on a real Essbase instance.
+    """
+    from epm.essbase import list_dimensions, search_members, Database
+
+    live_profile = get_live_test_instance()
+    app_list = await list_applications(live_profile)
+    assert isinstance(app_list, list), f"Expected application list, got: {type(app_list)}"
+    assert len(app_list) > 0, "No applications found to test member search"
+
+    first_app_name = app_list[0]
+    app_profile = Application(
+        url=live_profile["url"],
+        user=live_profile["user"],
+        pwd=live_profile["pwd"],
+        app=first_app_name
+    )
+    db_list = await list_databases(app_profile)
+    assert isinstance(db_list, list), f"Expected list of databases, got: {type(db_list)}"
+    assert len(db_list) > 0, f"No databases returned for application '{first_app_name}'"
+
+    first_db_name = db_list[0]
+    db_profile = Database(
+        url=live_profile["url"],
+        user=live_profile["user"],
+        pwd=live_profile["pwd"],
+        app=first_app_name,
+        db=first_db_name
+    )
+    dim_result = await list_dimensions(db_profile)
+
+    member_result = await search_members(db_profile, dim_result)
+    print(f"Search results for {dim_result} in db '{first_db_name}' of app '{first_app_name}':", member_result)
+    assert isinstance(member_result, list), f"Expected list result, got: {type(member_result)}"
+    assert len(member_result) > 0, f"No members found for query {dim_result} in database '{first_db_name}'"

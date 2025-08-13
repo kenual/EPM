@@ -1,3 +1,8 @@
+from epm.mdx import (
+    MemberRange, SetFunction, Set,
+    member_range_MDX_expression as _member_range_MDX_expression,
+    set_MDX_expression as _set_MDX_expression,
+)
 from typing import List, TypedDict
 from urllib.parse import urlparse
 
@@ -21,6 +26,12 @@ class Application(UserProfile):
 
 class Database(Application):
     db: str
+
+
+class Member(TypedDict):
+    dimension: str
+    name: str
+    unique_name: str
 
 
 def get_base_url(url: str) -> str:
@@ -147,11 +158,41 @@ async def list_dimensions(db_profile: Database) -> List[str] | str:
             return f'''Error: GET {resource_url}\nHTTP {response.status_code}\n{response.text}'''
 
 
-from mdx import (
-    MemberRange, SetFunction, Set,
-    member_range_MDX_expression as _member_range_MDX_expression,
-    set_MDX_expression as _set_MDX_expression,
-)
+@mcp.tool()
+async def search_members(db_profile: Database, entity_names: List[str]) -> List[Member] | str:
+    """Search for members in the specified database.
+
+    Args:
+        db_profile: Database dict with Essbase connection, application name, and database name.
+        entity_names: List of member names to search for.
+    """
+    base_url = get_base_url(db_profile['url'])
+    app = db_profile['app']
+    db = db_profile['db']
+    user = db_profile['user']
+    pwd = db_profile['pwd']
+
+    resource_url = f"{base_url}/outline/{app}/{db}?links=none&limit=5&matchWholeWord=true"
+    member_list = []
+    for entity_name in entity_names:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{resource_url}&keyword={entity_name}",
+                auth=(user, pwd),
+                headers={"Accept": "application/json"}
+            )
+            if response.status_code == 200:
+                data = response.json()
+                for item in data.get('items', []):
+                    member = Member(
+                        dimension=item['dimension'],
+                        name=item['name'],
+                        full_name=item['uniqueName']
+                    )
+                    member_list.append(member)
+            else:
+                member_list.append(None)
+    return member_list
 
 member_range_MDX_expression = mcp.tool()(_member_range_MDX_expression)
 set_MDX_expression = mcp.tool()(_set_MDX_expression)
