@@ -4,6 +4,7 @@ import pytest_asyncio
 from unittest.mock import patch, AsyncMock, Mock
 from epm.essbase import connect, list_applications, list_databases, Application, UserProfile
 
+
 def get_live_test_instance():
     with open("test_config.toml", "rb") as f:
         config = tomllib.load(f)
@@ -192,31 +193,29 @@ async def test_search_members_live_no_mock():
 
     live_profile = get_live_test_instance()
     app_list = await list_applications(live_profile)
-    assert isinstance(app_list, list), f"Expected application list, got: {type(app_list)}"
+    assert isinstance(
+        app_list, list), f"Expected application list, got: {type(app_list)}"
     assert len(app_list) > 0, "No applications found to test member search"
 
-    first_app_name = app_list[0]
-    app_profile = Application(
-        url=live_profile["url"],
-        user=live_profile["user"],
-        pwd=live_profile["pwd"],
-        app=first_app_name
-    )
-    db_list = await list_databases(app_profile)
-    assert isinstance(db_list, list), f"Expected list of databases, got: {type(db_list)}"
-    assert len(db_list) > 0, f"No databases returned for application '{first_app_name}'"
+    if 'Sample' in app_list:
+        test_app_name = 'Sample'
+        test_db_name = 'Basic'
+        db_profile = Database(
+            url=live_profile["url"],
+            user=live_profile["user"],
+            pwd=live_profile["pwd"],
+            app=test_app_name,
+            db=test_db_name
+        )
 
-    first_db_name = db_list[0]
-    db_profile = Database(
-        url=live_profile["url"],
-        user=live_profile["user"],
-        pwd=live_profile["pwd"],
-        app=first_app_name,
-        db=first_db_name
-    )
-    dim_result = await list_dimensions(db_profile)
-
-    member_result = await search_members(db_profile, dim_result)
-    print(f"Search results for {dim_result} in db '{first_db_name}' of app '{first_app_name}':", member_result)
-    assert isinstance(member_result, list), f"Expected list result, got: {type(member_result)}"
-    assert len(member_result) > 0, f"No members found for query {dim_result} in database '{first_db_name}'"
+        search_entities = ["Market", "Jan", "California", "100", "Sales"]
+        search_result = await search_members(db_profile, search_entities)
+        print(
+            f"Search results for {search_entities} in db '{test_db_name}' of app '{test_app_name}':", search_result)
+        assert isinstance(
+            search_result, dict), f"Expected dict result, got: {type(search_result)}"
+        # Ensure that every entity searched is a key, and its value is a dict (Member) or not None
+        for entity in search_entities:
+            assert entity in search_result, f"Key '{entity}' not found in search_result"
+            member = search_result[entity]
+            assert member is not None, f"No member found for query '{entity}' in database '{test_db_name}'"

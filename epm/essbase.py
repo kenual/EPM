@@ -3,7 +3,7 @@ from epm.mdx import (
     member_range_MDX_expression as _member_range_MDX_expression,
     set_MDX_expression as _set_MDX_expression,
 )
-from typing import List, TypedDict
+from typing import Dict, List, TypedDict
 from urllib.parse import urlparse
 
 import httpx
@@ -159,7 +159,7 @@ async def list_dimensions(db_profile: Database) -> List[str] | str:
 
 
 @mcp.tool()
-async def search_members(db_profile: Database, entity_names: List[str]) -> List[Member] | str:
+async def search_members(db_profile: Database, entity_names: List[str]) -> Dict[str, List[Member]] | str:
     """Search for members in the specified database.
 
     Args:
@@ -172,8 +172,8 @@ async def search_members(db_profile: Database, entity_names: List[str]) -> List[
     user = db_profile['user']
     pwd = db_profile['pwd']
 
-    resource_url = f"{base_url}/outline/{app}/{db}?links=none&limit=5&matchWholeWord=true"
-    member_list = []
+    resource_url = f"{base_url}/outline/{app}/{db}?links=none&fields=MEMBERSANDALIASES&limit=5&matchWholeWord=true"
+    result_dict = {}
     for entity_name in entity_names:
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -181,18 +181,38 @@ async def search_members(db_profile: Database, entity_names: List[str]) -> List[
                 auth=(user, pwd),
                 headers={"Accept": "application/json"}
             )
-            if response.status_code == 200:
-                data = response.json()
-                for item in data.get('items', []):
-                    member = Member(
-                        dimension=item['dimension'],
-                        name=item['name'],
-                        full_name=item['uniqueName']
-                    )
-                    member_list.append(member)
+            if response.status_code != 200:
+                result_dict[entity_name] = None
+                continue
+            data = response.json()
+            items = data.get('items', [])
+            if len(items) == 0:
+                result_dict[entity_name] = None
+                continue
+
+            if len(items) == 1:
+                # Only one item found, use it directly
+                item = items[0]
             else:
-                member_list.append(None)
-    return member_list
+                # Multiple items found, apply selection logic
+                # 1. Match uniqueName == entity_name
+                item = next((itm for itm in items if itm.get('uniqueName') == entity_name), None)
+                if not item:
+                    # 2. Match name == entity_name
+                    item = next((itm for itm in items if itm.get('name') == entity_name), None)
+                if not item:
+                    # 3. Fallback to first item
+                    item = items[0]
+
+            member_name = item.get('name', '')
+            member = Member(
+                dimension=item.get('dimensionName', member_name),
+                name=member_name,
+                unique_name=item['uniqueName']
+            )
+            result_dict[entity_name] = member
+
+    return result_dict
 
 member_range_MDX_expression = mcp.tool()(_member_range_MDX_expression)
 set_MDX_expression = mcp.tool()(_set_MDX_expression)
