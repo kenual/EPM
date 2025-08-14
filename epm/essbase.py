@@ -32,6 +32,11 @@ class Member(TypedDict):
     unique_name: str
 
 
+class SearchMemberResult(TypedDict):
+    entity_name: str
+    member: Member | None
+
+
 def get_base_url(url: str) -> str:
     if url and url.startswith("http"):
         parsed_url = urlparse(url)
@@ -157,7 +162,7 @@ async def list_dimensions(db_profile: Database) -> List[str] | str:
 
 
 @mcp.tool()
-async def search_members(db_profile: Database, entity_names: List[str]) -> dict[str, Member | None] | str:
+async def search_members(db_profile: Database, entity_names: List[str]) -> List[SearchMemberResult] | str:
     """Search for members in the specified Essbase database.
 
     Args:
@@ -165,9 +170,8 @@ async def search_members(db_profile: Database, entity_names: List[str]) -> dict[
         entity_names (List[str]): List of member names to search for.
 
     Returns:
-        dict[str, Member | None] | str: A dictionary mapping each input entity name to the found member details (with
-        'dimension', 'name', and 'unique_name' fields) or None if the member is not found.
-        Returns a string with error information if the search fails.
+        List[SearchMemberResult] | str: A list of SearchMemberResult dicts, where each contains
+        'entity_name' and 'member' (a Member dict or None if not found). Returns a string if the search fails.
     """
     base_url = get_base_url(db_profile['url'])
     app = db_profile['app']
@@ -176,7 +180,7 @@ async def search_members(db_profile: Database, entity_names: List[str]) -> dict[
     pwd = db_profile['pwd']
 
     resource_url = f"{base_url}/outline/{app}/{db}?links=none&fields=MEMBERSANDALIASES&limit=5&matchWholeWord=true"
-    result_dict = {}
+    results: List[SearchMemberResult] = []
     for entity_name in entity_names:
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -185,26 +189,21 @@ async def search_members(db_profile: Database, entity_names: List[str]) -> dict[
                 headers={"Accept": "application/json"}
             )
             if response.status_code != 200:
-                result_dict[entity_name] = None
+                results.append({"entity_name": entity_name, "member": None})
                 continue
             data = response.json()
             items = data.get('items', [])
             if len(items) == 0:
-                result_dict[entity_name] = None
+                results.append({"entity_name": entity_name, "member": None})
                 continue
 
             if len(items) == 1:
-                # Only one item found, use it directly
                 item = items[0]
             else:
-                # Multiple items found, apply selection logic
-                # 1. Match uniqueName == entity_name
                 item = next((itm for itm in items if itm.get('uniqueName') == entity_name), None)
                 if not item:
-                    # 2. Match name == entity_name
                     item = next((itm for itm in items if itm.get('name') == entity_name), None)
                 if not item:
-                    # 3. Fallback to first item
                     item = items[0]
 
             member_name = item.get('name', '')
@@ -213,9 +212,9 @@ async def search_members(db_profile: Database, entity_names: List[str]) -> dict[
                 name=member_name,
                 unique_name=item['uniqueName']
             )
-            result_dict[entity_name] = member
+            results.append({"entity_name": entity_name, "member": member})
 
-    return result_dict
+    return results
 
 member_range_MDX_expression = mcp.tool()(_member_range_MDX_expression)
 set_MDX_expression = mcp.tool()(_set_MDX_expression)

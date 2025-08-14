@@ -210,16 +210,22 @@ async def test_search_members_live_no_mock():
 
         search_entities = ["Market", "Jan", "California", "100", "Sales"]
         search_result = await search_members(db_profile, search_entities)
-        print(
-            f"Search results for {search_entities} in db '{test_db_name}' of app '{test_app_name}':", search_result)
+
         assert isinstance(
-            search_result, dict), f"Expected dict result, got: {type(search_result)}"
-        # Ensure that every entity searched is a key, and its value is a dict (Member) or not None
-        for entity in search_entities:
-            assert entity in search_result, f"Key '{entity}' not found in search_result"
-            member = search_result[entity]
+            search_result, list), f"Expected list result, got: {type(search_result)}"
+        assert len(search_result) == len(search_entities), (
+            f"Expected result length {len(search_entities)}, got: {len(search_result)}"
+        )
+        # Check that every entity has a corresponding result (by entity_name)
+        for idx, entity in enumerate(search_entities):
+            result = search_result[idx]
+            assert isinstance(result, dict), f"Result at idx {idx} is not a dict: {type(result)}"
+            assert "entity_name" in result, f"'entity_name' missing in result at idx {idx}: {result}"
+            assert result["entity_name"] == entity, f"Expected entity_name '{entity}', got '{result['entity_name']}'"
+            assert "member" in result, f"'member' missing in result at idx {idx}: {result}"
+            member = result["member"]
             assert member is not None, f"No member found for query '{entity}' in database '{test_db_name}'"
-            assert isinstance(member, dict), f"Returned value for '{entity}' is not a dict: {type(member)}"
+            assert isinstance(member, dict), f"Returned member for '{entity}' is not a dict: {type(member)}"
             for k in ("dimension", "name", "unique_name"):
                 assert k in member, f"Key '{k}' missing from returned member for '{entity}': {member}"
                 assert isinstance(member[k], str), f"Value for key '{k}' in member for '{entity}' is not a string: {type(member[k])}"
