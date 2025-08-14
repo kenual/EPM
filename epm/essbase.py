@@ -1,40 +1,17 @@
-from epm.mdx import (
-    member_range_MDX_expression as _member_range_MDX_expression,
-    set_MDX_expression as _set_MDX_expression,
-)
-from typing import Dict, List, TypedDict
+from typing import Dict, List
 from urllib.parse import urlparse
 
 import httpx
 from mcp.server.fastmcp import FastMCP
 
+from epm.mdx import (
+    member_range_MDX_expression as _member_range_MDX_expression,
+    set_MDX_expression as _set_MDX_expression,
+)
+from epm.data_types import UserProfile, Application, Database, Member
+
 # Initialize FastMCP server
 mcp = FastMCP("Essbase")
-
-
-class UserProfile(TypedDict):
-    url: str
-    user: str
-    pwd: str
-
-
-class Application(UserProfile):
-    app: str
-
-
-class Database(Application):
-    db: str
-
-
-class Member(TypedDict):
-    dimension: str
-    name: str
-    unique_name: str
-
-
-class SearchMemberResult(TypedDict):
-    entity_name: str
-    member: Member | None
 
 
 def get_base_url(url: str) -> str:
@@ -162,7 +139,7 @@ async def list_dimensions(db_profile: Database) -> List[str] | str:
 
 
 @mcp.tool()
-async def search_members(db_profile: Database, entity_names: List[str]) -> List[SearchMemberResult] | str:
+async def search_members(db_profile: Database, entity_names: List[str]) -> Dict[str, Member | None] | str:
     """Search for members in the specified Essbase database.
 
     Args:
@@ -170,8 +147,8 @@ async def search_members(db_profile: Database, entity_names: List[str]) -> List[
         entity_names (List[str]): List of member names to search for.
 
     Returns:
-        List[SearchMemberResult] | str: A list of SearchMemberResult dicts, where each contains
-        'entity_name' and 'member' (a Member dict or None if not found). Returns a string if the search fails.
+        Dict[str, Member | None] | str: A dictionary mapping each entity_name to a Member dict (None if not found).
+        Returns a string if the search fails.
     """
     base_url = get_base_url(db_profile['url'])
     app = db_profile['app']
@@ -180,7 +157,7 @@ async def search_members(db_profile: Database, entity_names: List[str]) -> List[
     pwd = db_profile['pwd']
 
     resource_url = f"{base_url}/outline/{app}/{db}?links=none&fields=MEMBERSANDALIASES&limit=5&matchWholeWord=true"
-    results: List[SearchMemberResult] = []
+    results: Dict[str, Member | None] = {}
     for entity_name in entity_names:
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -189,20 +166,23 @@ async def search_members(db_profile: Database, entity_names: List[str]) -> List[
                 headers={"Accept": "application/json"}
             )
             if response.status_code != 200:
-                results.append({"entity_name": entity_name, "member": None})
+                results[entity_name] = None
                 continue
             data = response.json()
             items = data.get('items', [])
             if len(items) == 0:
-                results.append({"entity_name": entity_name, "member": None})
+                results[entity_name] = None
                 continue
 
+            # Only include results where name or uniqueName matches exactly, or if only one result
             if len(items) == 1:
                 item = items[0]
             else:
-                item = next((itm for itm in items if itm.get('uniqueName') == entity_name), None)
+                item = next((itm for itm in items if itm.get(
+                    'uniqueName') == entity_name), None)
                 if not item:
-                    item = next((itm for itm in items if itm.get('name') == entity_name), None)
+                    item = next((itm for itm in items if itm.get(
+                        'name') == entity_name), None)
                 if not item:
                     item = items[0]
 
@@ -212,7 +192,7 @@ async def search_members(db_profile: Database, entity_names: List[str]) -> List[
                 name=member_name,
                 unique_name=item['uniqueName']
             )
-            results.append({"entity_name": entity_name, "member": member})
+            results[entity_name] = member
 
     return results
 

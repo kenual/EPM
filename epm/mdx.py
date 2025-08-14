@@ -1,9 +1,11 @@
 from typing import List, TypedDict
 from pydantic import BaseModel
 
+from epm.data_types import Member
+
 class MemberRange(TypedDict):
-    start_member_name: str
-    end_member_name: str
+    start_member_name: Member
+    end_member_name: Member
 
 class SetFunction(BaseModel):
     function_name: str
