@@ -189,7 +189,7 @@ async def test_search_members_live_no_mock():
     """
     Live integration test: searches for a member in the first database of the first application on a real Essbase instance.
     """
-    from epm.essbase import search_members, Database
+    from epm.essbase import search_members, Database, Member
 
     live_profile = get_live_test_instance()
     app_list = await list_applications(live_profile)
@@ -219,3 +219,7 @@ async def test_search_members_live_no_mock():
             assert entity in search_result, f"Key '{entity}' not found in search_result"
             member = search_result[entity]
             assert member is not None, f"No member found for query '{entity}' in database '{test_db_name}'"
+            assert isinstance(member, dict), f"Returned value for '{entity}' is not a dict: {type(member)}"
+            for k in ("dimension", "name", "unique_name"):
+                assert k in member, f"Key '{k}' missing from returned member for '{entity}': {member}"
+                assert isinstance(member[k], str), f"Value for key '{k}' in member for '{entity}' is not a string: {type(member[k])}"

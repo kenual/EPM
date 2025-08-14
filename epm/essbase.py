@@ -1,5 +1,4 @@
 from epm.mdx import (
-    MemberRange, SetFunction, Set,
     member_range_MDX_expression as _member_range_MDX_expression,
     set_MDX_expression as _set_MDX_expression,
 )
@@ -8,7 +7,6 @@ from urllib.parse import urlparse
 
 import httpx
 from mcp.server.fastmcp import FastMCP
-from pydantic import BaseModel
 
 # Initialize FastMCP server
 mcp = FastMCP("Essbase")
@@ -159,12 +157,17 @@ async def list_dimensions(db_profile: Database) -> List[str] | str:
 
 
 @mcp.tool()
-async def search_members(db_profile: Database, entity_names: List[str]) -> Dict[str, List[Member]] | str:
-    """Search for members in the specified database.
+async def search_members(db_profile: Database, entity_names: List[str]) -> dict[str, Member | None] | str:
+    """Search for members in the specified Essbase database.
 
     Args:
-        db_profile: Database dict with Essbase connection, application name, and database name.
-        entity_names: List of member names to search for.
+        db_profile (Database): Dictionary containing Essbase connection details, application name, and database name.
+        entity_names (List[str]): List of member names to search for.
+
+    Returns:
+        dict[str, Member | None] | str: A dictionary mapping each input entity name to the found member details (with
+        'dimension', 'name', and 'unique_name' fields) or None if the member is not found.
+        Returns a string with error information if the search fails.
     """
     base_url = get_base_url(db_profile['url'])
     app = db_profile['app']
