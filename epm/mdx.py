@@ -3,15 +3,19 @@ from pydantic import BaseModel
 
 from epm.data_types import Member
 
+
 class MemberRange(TypedDict):
     start_member_name: Member
     end_member_name: Member
 
+
 class SetFunction(BaseModel):
     function_name: str
 
+
 class Set(TypedDict):
     members: MemberRange | List[str] | SetFunction
+
 
 def member_range_MDX_expression(member_range: MemberRange) -> str:
     """
@@ -23,7 +27,8 @@ def member_range_MDX_expression(member_range: MemberRange) -> str:
     Returns:
         str: An MDX expression representing the member range.
     """
-    return f"MemberRange({member_range['start_member_name']}, {member_range['end_member_name']})"
+    return f"MemberRange({member_range['start_member_name']['unique_name']}, {member_range['end_member_name']['unique_name']})"
+
 
 def set_MDX_expression(set_: Set) -> str:
     """
